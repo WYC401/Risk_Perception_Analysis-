@@ -4,12 +4,17 @@ library(dplyr)
 library(plyr)
 data <- load(here::here("raw_data/moduletwo.rda"))
 l <- moduletwo[1,]
+
 nameOfQuestion <- names(l)
 dependentVariablesNames <- c( 
                             nameOfQuestion[str_detect(nameOfQuestion, regex("Ben", ignore_case= TRUE))],
                             nameOfQuestion[str_detect(nameOfQuestion, regex("Risky", ignore_case= TRUE))]
                             )
 KehenScaleNames <- nameOfQuestion[str_detect(nameOfQuestion, regex("K_", ignore_case= TRUE))]
+governanceScaleNames <- names(l[str_detect(l, regex("Q2.8", ignore_case= TRUE))])
+economyScaleNames <- names(l[str_detect(l, regex("Q2.9", ignore_case= TRUE))])
+characterRiskScaleNames <- names(l[str_detect(l, regex("Q2.1[0-5]", ignore_case= TRUE))])
+
 r <- nrow(moduletwo)
 dataUsed <- moduletwo[3:r,]
 beneficialLikert <- c(
@@ -34,9 +39,7 @@ riskyLikert <- c("Not at all risky",
                  "Very risky",
                  "Extremely risky")
 
-dataUsed <- dataUsed %>% sapply(
-  function(x) { mapvalues(x, c(beneficialLikert, agreeLikert, riskyLikert, "Rather not say/Don't know"), c( 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, NA) )}
-)
+
 
 temp <- dataUsed  %>% mutate_at(vars(starts_with("Risky")), funs(case_when(. =="Not at all risky" ~ 1, 
                                                                 . =="Slightly risky" ~ 2, 
@@ -57,6 +60,9 @@ temp <- dataUsed  %>% mutate_at(vars(starts_with("Risky")), funs(case_when(. =="
                                                                         . == "Neither agree nor disagree" ~3,
                                                                         . == "Somewhat agree" ~ 4,
                                                                         . == "Strongly agree" ~ 5)))
-dataUsed <- dataUsed %>% sapply( function(x) {
-  mapvalues(x, agreeLikert, c(1, 2, 3, 4, 5))
-})
+temp <- temp %>% select(c(KehenScaleNames, governanceScaleNames, economyScaleNames, characterRiskScaleNames))
+
+temp <- temp %>% mutate(economyScale = rowMeans(select(temp, economyScaleNames))) %>%
+  mutate(governanceScale = rowMeans(select(temp, governanceScaleNames))) %>%
+  mutate(characterRiskScale = rowMeans(select(temp, characterRiskScaleNames)))
+        
