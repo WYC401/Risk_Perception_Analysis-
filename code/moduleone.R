@@ -1,91 +1,19 @@
-library(here)
-library(stringr)
-library(dplyr)
-library(plyr)
-load(here::here("raw_data/moduletwo.rda"))
-load(here::here("raw_data/moduleone.rda"))
-l <- moduletwo[1,]
-
-nameOfQuestion <- names(l)
-dependentVariablesNames <- c( 
-                            nameOfQuestion[str_detect(nameOfQuestion, regex("Ben", ignore_case= TRUE))],
-                            nameOfQuestion[str_detect(nameOfQuestion, regex("Risky", ignore_case= TRUE))]
-                            )
-KehenScaleNames <- nameOfQuestion[str_detect(nameOfQuestion, regex("K_", ignore_case= TRUE))]
-governanceScaleNames <- names(l[str_detect(l, regex("Q2.8", ignore_case= TRUE))])
-economyScaleNames <- names(l[str_detect(l, regex("Q2.9", ignore_case= TRUE))])
-characterRiskScaleNames <- names(l[str_detect(l, regex("Q2.1[0-5]", ignore_case= TRUE))])
-
-r <- nrow(moduletwo)
-dataUsed <- moduletwo[3:r,]
-beneficialLikert <- c(
-            "Not at all beneficial",
-            "Slightly beneficial",
-            "Moderately beneficial",
-            "Very beneficial",
-            "Extremely beneficial"
-            )
-
-agreeLikert <- c(
-            "Strongly disagree",
-            "Somewhat disagree",
-            "Neither agree nor disagree",
-            "Somewhat agree",
-            "Strongly agree"
-            )
-
-riskyLikert <- c("Not at all risky",
-                 "Slightly risky",
-                 "Moderately risky",
-                 "Very risky",
-                 "Extremely risky")
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(readxl))
+suppressPackageStartupMessages(library(dplyr))
 
 
+moduleone <- read_excel(here::here("raw_data/livelihood_insecurity_complete.xlsx"))
+save(moduleone, file = "moduleone.rda")
+module1 <- data.frame(moduleone)
+module1 %>%
+  filter(!row_number() %in% c(1,2))
 
-temp <- dataUsed  %>% mutate_at(vars(starts_with("Risky")), funs(case_when(. =="Not at all risky" ~ 1, 
-                                                                . =="Slightly risky" ~ 2, 
-                                                                . =="Moderately risky" ~ 3, 
-                                                                . =="Very risky" ~ 4, 
-                                                                . =="Extremely risky" ~ 5))) %>%
-  
-  # replace beneficial likert scale with numbers  
-  mutate_at(vars(starts_with("Ben")), funs(case_when(. =="Not at all beneficial" ~ 1,
-                                                     . =="Slightly beneficial" ~ 2,
-                                                     . =="Moderately beneficial" ~ 3,
-                                                     . =="Very beneficial" ~ 4,
-                                                     . =="Extremely beneficial" ~ 5 ))) %>%
-  
-  # replace nuclear acceptance likert scale with numbers
-  mutate_at(vars(! (starts_with("Ben") | starts_with("Risk"))), funs(case_when(. == "Strongly disagree" ~ 1, 
-                                                                        . == "Somewhat disagree" ~ 2,
-                                                                        . == "Neither agree nor disagree" ~3,
-                                                                        . == "Somewhat agree" ~ 4,
-                                                                        . == "Strongly agree" ~ 5)))
-temp <- temp %>% select(c(KehenScaleNames, governanceScaleNames, economyScaleNames, characterRiskScaleNames))
 
-temp <- temp %>% mutate(economyScale = rowMeans(select(temp, economyScaleNames))) %>%
-  mutate(governanceScale = rowMeans(select(temp, governanceScaleNames))) %>%
-  mutate(characterRiskScale = rowMeans(select(temp, characterRiskScaleNames)))
-
-temp %>% select(governanceScaleNames) %>% apply(1, function(x) (prod(x))^(1.0 / length(x)))
-
-humanAsset1 <- c("Q5.4", "Q5.5", "Q5.6", "Q3.2")
-humanAsset2 <- c("Q5.4", "Q5.5", "Q5.6", "Q4.6")
-
-physicalAsset <- c("Q5.6", "Q5.8", "Q5.9", "Q5.10", "Q5.11", "Q5.12", "Q5.13", "Q5.14", "Q5.15") #find 
-
-socialAsset1 <- c("Q5.16", "Q3.3", "Q5.17")
-socialAsset2 <- c("Q5.16", "Q4.7", "Q5.17")
-
-financialAsset <- c("Q5.1", "Q5.2", "Q5.3")
-
-naturalAsset1 <- c("Q3.4", "Q3.5", "Q3.6", "Q5.18")
-naturalAsset2 <- c("Q4.8", "Q5.18")
-
-livehoodOutcomes <- c("Q5.18", "Q5.20", "Q5.21", "Q5.23")
+namesModuleMap <- co[1, ]
 
 #This chunk contains the coding schemes of various scales used in survey one: eco-political factors, kahan scale and acceptance scale
-codedmodule1 <- moduleone %>%
+codedmodule1 <- module1 %>%
   
   #remove row 1
   filter(!row_number() %in% c(1,2)) %>% 
@@ -96,18 +24,23 @@ codedmodule1 <- moduleone %>%
                                                        . =="Moderately risky" ~ 3, 
                                                        . =="Very risky" ~ 4, 
                                                        . =="Extremely risky" ~ 5))) %>%
+  
   # replace beneficial likert scale with numbers  
   mutate_at(vars(starts_with("Ben")), funs(case_when(. =="Not at all beneficial" ~ 1,
                                                      . =="Slightly beneficial" ~ 2,
                                                      . =="Moderately beneficial" ~ 3,
                                                      . =="Very beneficial" ~ 4,
                                                      . =="Extremely beneficial" ~ 5 ))) %>%
+  
   # replace nuclear acceptance likert scale with numbers
   mutate_at(vars(N_accept,N_reluctantlyaccept,N_reject), funs(case_when(. == "Strongly disagree" ~ 1, 
                                                                         . == "Somewhat disagree" ~ 2,
                                                                         . == "Neither agree nor disagree" ~3,
                                                                         . == "Somewhat agree" ~ 4,
                                                                         . == "Strongly agree" ~ 5))) %>%
+  
+  
+  
   mutate_at(vars(Livelihood_Income), funs(case_when(. == "(a) own farming/fishing/animal rearing/business" ~ "LSI", 
                                                     . == "(b) employed for wages/salary" ~ "ISI",
                                                     . == "(c) student" ~"student",
@@ -143,6 +76,8 @@ codedmodule1 <- moduleone %>%
   
   mutate_at(vars(Lboat, houseown), funs(case_when(.== "Own it" ~ 1,
                                                   .== "Rent it" ~ 0)))%>%
+  
+  
   # J security index coding
   
   mutate_at(vars(JISRkeep), funs(case_when(. == "Strongly disagree" ~ 1, 
@@ -213,7 +148,69 @@ codedmodule1 <- moduleone %>%
                                                . == "Neither adequate nor inadequate" ~ 4,
                                                . == "Slightly adequate" ~ 5,
                                                . == "Moderately adequate" ~ 6,
-                                               . == "Extremely adequate" ~ 7)))
+                                               . == "Extremely adequate" ~ 7)))%>%
+  
+  separate( col = cookstove, into = c("cook1", "cook2", "cook3", "cook4"), sep = ",") %>%
+  separate( col = vehicle, into = c("vehicle1", "vehicle2", "vehicle3", "vehicle4"), sep = ",")%>%
+  separate( col = foodsource, into = c("food1", "food2", "food3", "food4"), sep = ",")
+
+
+codedmodule1$Llenght = as.numeric(codedmodule1$Llenght)
+codedmodule1$Llenght[is.na(codedmodule1$Llenght)]=0
+codedmodule1$Ilenght = as.numeric(codedmodule1$Ilenght)
+codedmodule1$Ilenght[is.na(codedmodule1$Ilenght)]=0
+temp <- codedmodule1$Llenght + codedmodule1$Ilenght
+humanAsset <- c("Q5.4", "Q5.5", "Q5.6", "I_Llenght")
+known_sum <- codedmodule1 %>% 
+  select( names(codedmodule1[, namesModuleMap %in% humanAsset])) %>%
+  apply(1, sum)
+humanAseetindex_a <- (known_sum + temp) / (length(humanAsset)+1)
+
+physicalAsset <- c("Q5.6", "Q5.8", "Q5.9_1_TEXT", "Q5.10", "Q5.11", "Q5.12", "Q5.13", "Q5.14", "Q5.15") #find 
+
+physicalAssetIndex_a <- codedmodule1 %>% 
+  select( names(codedmodule1[, namesModuleMap %in% physicalAsset])) %>%
+  select( -c("cook1", "cook3")) %>%
+  apply(1, mean)
+
+
+socialAsset <- c("Q5.16", "Q5.17")
+
+
+known_sum <- codedmodule1 %>% 
+  select(names(namesModuleMap[namesModuleMap %in% socialAsset]))
+
+codedmodule1$Lassociation[codedmodule1$Lassociation == "Yes"] <- "1"
+codedmodule1$Lassociation[codedmodule1$Lassociation == "No"] <- "0"
+codedmodule1$Lassociation <- as.numeric(codedmodule1$Lassociation)
+codedmodule1$Lassociation[is.na(codedmodule1$Lassociation)] <- 0
+codedmodule1$Iassociation[is.na(codedmodule1$Iassociation)] <- 0
+
+socialAssetIndex_a <- (known_sum + codedmodule1$Lassociation + codedmodule1$Iassociation) / 2
+
+financialAsset <- c("Q5.1", "Q5.2", "Q5.3")
+
+financialAssetIndex_a <- codedmodule1 %>% 
+  select(names(namesModuleMap[namesModuleMap %in% financialAsset])) %>%
+  apply(1, mean)
 
 
 
+naturalAsset <- c("Q3.4_1_TEXT", "Q3.5", "Q3.6", "Q5.18","Q4.8_1_TEXT")
+
+codedmodule1$totalincome <- as.numeric(codedmodule1$totalincome)
+codedmodule1$totalincome[is.na(codedmodule1$totalincome)] <- 0
+codedmodule1$Lflandarea <- as.numeric(codedmodule1$Lflandarea)
+codedmodule1$Lflandarea[is.na(codedmodule1$Lflandarea)] <- 0
+codedmodule1$Lboat[is.na(codedmodule1$Lboat)] <- 0
+codedmodule1$Ipropvalue <- as.numeric(codedmodule1$Ipropvalue)
+codedmodule1$Ipropvalue[is.na(codedmodule1$Iprovalue)] <- 0
+naturalAssetIndex_a <- (codedmodule1$totalincome +codedmodule1$Lflandarea + codedmodule1$Lboat + codedmodule1$Ipropvalue + codedmodule1$polparty) /4
+
+
+
+livehoodOutcomes <- c("Q5.18", "Q5.20", "Q5.21", "Q5.23")
+
+livehoodOutcomesIndex_a <- codedmodule1 %>% 
+  select(names(namesModuleMap[namesModuleMap %in% livehoodOutcomes])) %>%
+  apply(1, mean)
