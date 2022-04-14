@@ -133,4 +133,7 @@ rSquareResult <- data.frame(Kahan, Prerna) %>% pivot_longer(cols = everything(),
 colnames(rSquareResult) <- c("Scale","R_Square")
 ggplot(data = rSquareResult , aes(y = R_Square, color =Scale)) + geom_boxplot() + theme(axis.ticks.x = element_blank(), axis.text.x = element_blank()) 
 
+AICResult <- data.frame(AIC_K, AIC_P) %>% pivot_longer(cols = everything(), names_to = "Scale")
+colnames(AICResult) <- c("Scale","AIC")
+ggplot(data = AICResult , aes(y = AIC, color =Scale)) + geom_boxplot() + theme(axis.ticks.x = element_blank(), axis.text.x = element_blank()) 
 
