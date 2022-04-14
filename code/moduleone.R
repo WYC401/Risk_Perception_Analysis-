@@ -1,16 +1,26 @@
+
 suppressPackageStartupMessages(library(tidyverse))
 suppressPackageStartupMessages(library(readxl))
 suppressPackageStartupMessages(library(dplyr))
-
 
 moduleone <- read_excel(here::here("raw_data/livelihood_insecurity_complete.xlsx"))
 save(moduleone, file = "moduleone.rda")
 module1 <- data.frame(moduleone)
 module1 %>%
   filter(!row_number() %in% c(1,2))
+nameOfQuestion <- names(moduleone)
+dependentVariablesNames <- c( 
+  nameOfQuestion[str_detect(nameOfQuestion, regex("Ben", ignore_case= TRUE))],
+  nameOfQuestion[str_detect(nameOfQuestion, regex("Risky", ignore_case= TRUE))],
+  nameOfQuestion[str_detect(nameOfQuestion, regex("N_", ignore_case= FALSE))]
+)
 
 
-namesModuleMap <- co[1, ]
+
+standardize = function(x){
+  z <- (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
+  return( z)
+}
 
 #This chunk contains the coding schemes of various scales used in survey one: eco-political factors, kahan scale and acceptance scale
 codedmodule1 <- module1 %>%
@@ -152,41 +162,71 @@ codedmodule1 <- module1 %>%
   
   separate( col = cookstove, into = c("cook1", "cook2", "cook3", "cook4"), sep = ",") %>%
   separate( col = vehicle, into = c("vehicle1", "vehicle2", "vehicle3", "vehicle4"), sep = ",")%>%
-  separate( col = foodsource, into = c("food1", "food2", "food3", "food4"), sep = ",")
+  separate( col = foodsource, into = c("food1", "food2", "food3", "food4"), sep = ",") 
+  
+namesModuleMap <- moduleone[1,]
+temp_codedmodule1 <- codedmodule1 %>% select(where(is.numeric) & -dependentVariablesNames) %>%
+  apply(2, standardize) 
 
 
-codedmodule1$Llenght = as.numeric(codedmodule1$Llenght)
+
+temp_namesToReplace <- colnames(temp_codedmodule1)
+
+temp_colLeft <- codedmodule1 %>% select( colnames(.) [! (colnames(.) %in% temp_namesToReplace)])
+
+codedmodule1 <- cbind(temp_colLeft, temp_codedmodule1)
+
+
+codedmodule1$Llenght = as.numeric(codedmodule1$Llenght) %>% standardize()
 codedmodule1$Llenght[is.na(codedmodule1$Llenght)]=0
-codedmodule1$Ilenght = as.numeric(codedmodule1$Ilenght)
+codedmodule1$Ilenght = as.numeric(codedmodule1$Ilenght) %>% standardize()
 codedmodule1$Ilenght[is.na(codedmodule1$Ilenght)]=0
 temp <- codedmodule1$Llenght + codedmodule1$Ilenght
 humanAsset <- c("Q5.4", "Q5.5", "Q5.6", "I_Llenght")
 known_sum <- codedmodule1 %>% 
-  select( names(codedmodule1[, namesModuleMap %in% humanAsset])) %>%
+  select( names(namesModuleMap[namesModuleMap %in% humanAsset])) %>%
   apply(1, sum)
-humanAseetindex_a <- (known_sum + temp) / (length(humanAsset)+1)
+humanAssetIndex_a <- (known_sum + temp) / (length(humanAsset)+1) 
 
-physicalAsset <- c("Q5.6", "Q5.8", "Q5.9_1_TEXT", "Q5.10", "Q5.11", "Q5.12", "Q5.13", "Q5.14", "Q5.15") #find 
+known_prod <- codedmodule1 %>% 
+  select( names(namesModuleMap[namesModuleMap %in% humanAsset])) %>%
+  apply(1, prod) 
+humanAssetIndex_g <- (known_prod * temp)^(1 / (length(humanAsset)+1)) 
+  
 
+physicalAsset <- c("Q5.6", "Q5.8", "Q5.9_1_TEXT", "Q5.10", "Q5.11", "Q5.12", "Q5.13") #find 
+
+codedmodule1$farwatermin <- as.numeric(codedmodule1$farwatermin)  %>% standardize()
 physicalAssetIndex_a <- codedmodule1 %>% 
-  select( names(codedmodule1[, namesModuleMap %in% physicalAsset])) %>%
-  select( -c("cook1", "cook3")) %>%
+  select( names(namesModuleMap[, namesModuleMap %in% physicalAsset])) %>%
   apply(1, mean)
+
+physicalAssetIndex_g <- codedmodule1 %>% 
+  select( names(namesModuleMap[, namesModuleMap %in% physicalAsset])) %>%
+  apply(1, function(x) (prod(x))^(1.0 / length(x)))
+
+
 
 
 socialAsset <- c("Q5.16", "Q5.17")
 
-
 known_sum <- codedmodule1 %>% 
-  select(names(namesModuleMap[namesModuleMap %in% socialAsset]))
+  select(names(namesModuleMap[namesModuleMap %in% socialAsset])) %>%
+  apply(1, sum) 
+
+known_prod <- codedmodule1 %>% 
+  select(names(namesModuleMap[namesModuleMap %in% socialAsset])) %>%
+  apply(1, function(x) (prod(x))^(1.0 / length(x)))
 
 codedmodule1$Lassociation[codedmodule1$Lassociation == "Yes"] <- "1"
 codedmodule1$Lassociation[codedmodule1$Lassociation == "No"] <- "0"
-codedmodule1$Lassociation <- as.numeric(codedmodule1$Lassociation)
+codedmodule1$Lassociation <- as.numeric(codedmodule1$Lassociation)  %>% standardize()
 codedmodule1$Lassociation[is.na(codedmodule1$Lassociation)] <- 0
 codedmodule1$Iassociation[is.na(codedmodule1$Iassociation)] <- 0
 
 socialAssetIndex_a <- (known_sum + codedmodule1$Lassociation + codedmodule1$Iassociation) / 2
+socialAssetIndex_g <- (known_sum * codedmodule1$Lassociation * codedmodule1$Iassociation)^(0.5)
+
 
 financialAsset <- c("Q5.1", "Q5.2", "Q5.3")
 
@@ -194,19 +234,22 @@ financialAssetIndex_a <- codedmodule1 %>%
   select(names(namesModuleMap[namesModuleMap %in% financialAsset])) %>%
   apply(1, mean)
 
+financialAssetIndex_g <- codedmodule1 %>% 
+  select(names(namesModuleMap[namesModuleMap %in% financialAsset])) %>%
+  apply(1, function(x) (prod(x))^(1.0 / length(x)))
 
 
 naturalAsset <- c("Q3.4_1_TEXT", "Q3.5", "Q3.6", "Q5.18","Q4.8_1_TEXT")
 
-codedmodule1$totalincome <- as.numeric(codedmodule1$totalincome)
+codedmodule1$totalincome <- as.numeric(codedmodule1$totalincome)  %>% standardize()
 codedmodule1$totalincome[is.na(codedmodule1$totalincome)] <- 0
-codedmodule1$Lflandarea <- as.numeric(codedmodule1$Lflandarea)
+codedmodule1$Lflandarea <- as.numeric(codedmodule1$Lflandarea)  %>% standardize()
 codedmodule1$Lflandarea[is.na(codedmodule1$Lflandarea)] <- 0
 codedmodule1$Lboat[is.na(codedmodule1$Lboat)] <- 0
-codedmodule1$Ipropvalue <- as.numeric(codedmodule1$Ipropvalue)
+codedmodule1$Ipropvalue <- as.numeric(codedmodule1$Ipropvalue)  %>% standardize()
 codedmodule1$Ipropvalue[is.na(codedmodule1$Iprovalue)] <- 0
 naturalAssetIndex_a <- (codedmodule1$totalincome +codedmodule1$Lflandarea + codedmodule1$Lboat + codedmodule1$Ipropvalue + codedmodule1$polparty) /4
-
+naturalAssetIndex_g <- (codedmodule1$totalincome * codedmodule1$Lflandarea * codedmodule1$Lboat * codedmodule1$Ipropvalue *  codedmodule1$polparty)^(0.25)
 
 
 livehoodOutcomes <- c("Q5.18", "Q5.20", "Q5.21", "Q5.23")
@@ -214,3 +257,56 @@ livehoodOutcomes <- c("Q5.18", "Q5.20", "Q5.21", "Q5.23")
 livehoodOutcomesIndex_a <- codedmodule1 %>% 
   select(names(namesModuleMap[namesModuleMap %in% livehoodOutcomes])) %>%
   apply(1, mean)
+
+livehoodOutcomesIndex_g <- codedmodule1 %>% 
+  select(names(namesModuleMap[namesModuleMap %in% livehoodOutcomes])) %>%
+  apply(1, function(x) (prod(x))^(1.0 / length(x)))
+
+arithmetic_columns <- c("socialAssetIndex_a", "humanAssetIndex_a", "socialAssetIndex_a",
+                     "financialAssetIndex_a", "naturalAssetIndex_a", "livehoodOutcomesIndex_a")
+
+geometric_columns <- c("socialAssetIndex_g", "humanAssetIndex_g", "socialAssetIndex_g",
+                        "financialAssetIndex_g", "naturalAssetIndex_g", "livehoodOutcomesIndex_g")
+
+
+dependentVariablesNames <- c( 
+  nameOfQuestion[str_detect(nameOfQuestion, regex("Ben", ignore_case= TRUE))],
+  nameOfQuestion[str_detect(nameOfQuestion, regex("Risky", ignore_case= TRUE))]
+)
+
+data_final <- codedmodule1 %>% 
+  select(dependentVariablesNames) %>% 
+  mutate(
+    socialAssetIndex_a = socialAssetIndex_a,
+    humanAssetIndex_a = humanAssetIndex_a,
+    physicalAssetIndex_a = physicalAssetIndex_a,
+    financialAssetIndex_a = financialAssetIndex_a,
+    naturalAssetIndex_a = naturalAssetIndex_a,
+    livehoodOutcomesIndex_a = livehoodOutcomesIndex_a,
+    socialAssetIndex_g = socialAssetIndex_g,
+    humanAssetIndex_g = humanAssetIndex_g,
+    physicalAssetIndex_g = physicalAssetIndex_g,
+    financialAssetIndex_g = financialAssetIndex_g,
+    naturalAssetIndex_g = naturalAssetIndex_g,
+    livehoodOutcomesIndex_g = livehoodOutcomesIndex_g
+  )
+
+
+R_Square_A <- rep(0, length(dependentVariablesNames))
+R_Square_G <- rep(0, length(dependentVariablesNames))
+AIC <- rep(0, length(dependentVariablesNames))
+
+for(i in 1:length(dependentVariablesNames)) {
+  formula_A <- as.formula(paste(dependentVariablesNames[i], " ~ ."))
+  tempA <- data_final %>% select(c(dependentVariablesNames[i], arithmetic_columns)) %>% lm(formula = formula_A, data = .)
+  R_Square_A[i] <- summary(tempA)$r.squared
+  mutLogistic <- nnet::multinom(formula = tempA, data = data_final)
+  AIC[i] <- mutLogistic$AIC
+  
+  formula_G <- as.formula(paste(dependentVariablesNames[i], " ~ ."))
+  tempG <- data_final %>% select(c(dependentVariablesNames[i], geometric_columns)) %>% lm(formula = formula_G, data = .)
+  R_Square_G[i] <- summary(tempG)$r.squared
+}
+
+
+

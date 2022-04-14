@@ -9,7 +9,8 @@ l <- moduletwo[1,]
 nameOfQuestion <- names(l)
 dependentVariablesNames <- c( 
                             nameOfQuestion[str_detect(nameOfQuestion, regex("Ben", ignore_case= TRUE))],
-                            nameOfQuestion[str_detect(nameOfQuestion, regex("Risky", ignore_case= TRUE))]
+                            nameOfQuestion[str_detect(nameOfQuestion, regex("Risky", ignore_case= TRUE))],
+                            nameOfQuestion[str_detect(nameOfQuestion, regex("N_", ignore_case= FALSE))]
                             )
 KehenScaleNames <- nameOfQuestion[str_detect(nameOfQuestion, regex("K_", ignore_case= TRUE))]
 governanceScaleNames <- names(l[str_detect(l, regex("Q2.8", ignore_case= TRUE))])
@@ -61,159 +62,18 @@ temp <- dataUsed  %>% mutate_at(vars(starts_with("Risky")), funs(case_when(. =="
                                                                         . == "Neither agree nor disagree" ~3,
                                                                         . == "Somewhat agree" ~ 4,
                                                                         . == "Strongly agree" ~ 5)))
-temp <- temp %>% select(c(KehenScaleNames, governanceScaleNames, economyScaleNames, characterRiskScaleNames))
+moduletwodata_final <- temp %>% select(c(dependentVariablesNames, KehenScaleNames, governanceScaleNames, economyScaleNames, characterRiskScaleNames))
 
-temp <- temp %>% mutate(economyScale = rowMeans(select(temp, economyScaleNames))) %>%
-  mutate(governanceScale = rowMeans(select(temp, governanceScaleNames))) %>%
-  mutate(characterRiskScale = rowMeans(select(temp, characterRiskScaleNames)))
 
-temp %>% select(governanceScaleNames) %>% apply(1, function(x) (prod(x))^(1.0 / length(x)))
-
-humanAsset1 <- c("Q5.4", "Q5.5", "Q5.6", "Q3.2")
-humanAsset2 <- c("Q5.4", "Q5.5", "Q5.6", "Q4.6")
-
-physicalAsset <- c("Q5.6", "Q5.8", "Q5.9", "Q5.10", "Q5.11", "Q5.12", "Q5.13", "Q5.14", "Q5.15") #find 
-
-socialAsset1 <- c("Q5.16", "Q3.3", "Q5.17")
-socialAsset2 <- c("Q5.16", "Q4.7", "Q5.17")
-
-financialAsset <- c("Q5.1", "Q5.2", "Q5.3")
-
-naturalAsset1 <- c("Q3.4", "Q3.5", "Q3.6", "Q5.18")
-naturalAsset2 <- c("Q4.8", "Q5.18")
-
-livehoodOutcomes <- c("Q5.18", "Q5.20", "Q5.21", "Q5.23")
-
-#This chunk contains the coding schemes of various scales used in survey one: eco-political factors, kahan scale and acceptance scale
-codedmodule1 <- moduleone %>%
+for(i in dependentVariablesNames) {
+  formulaK <- as.formula(paste(i, " ~ ."))
+  tempK <- moduletwodata_final %>% select(c(i, KehenScaleNames)) %>% lm(formula = formulaK, data = .)
+  rK <- summary(tempK)$r.squared
   
-  #remove row 1
-  filter(!row_number() %in% c(1,2)) %>% 
+  formulaK <- as.formula(paste(i, " ~ ."))
+  tempK <- moduletwodata_final %>% select(c(i, )) %>% lm(formula = formulaK, data = .)
   
-  # replace risky likert scale with numbers
-  mutate_at(vars(starts_with("Risky")), funs(case_when(. =="Not at all risky" ~ 1, 
-                                                       . =="Slightly risky" ~ 2, 
-                                                       . =="Moderately risky" ~ 3, 
-                                                       . =="Very risky" ~ 4, 
-                                                       . =="Extremely risky" ~ 5))) %>%
-  # replace beneficial likert scale with numbers  
-  mutate_at(vars(starts_with("Ben")), funs(case_when(. =="Not at all beneficial" ~ 1,
-                                                     . =="Slightly beneficial" ~ 2,
-                                                     . =="Moderately beneficial" ~ 3,
-                                                     . =="Very beneficial" ~ 4,
-                                                     . =="Extremely beneficial" ~ 5 ))) %>%
-  # replace nuclear acceptance likert scale with numbers
-  mutate_at(vars(N_accept,N_reluctantlyaccept,N_reject), funs(case_when(. == "Strongly disagree" ~ 1, 
-                                                                        . == "Somewhat disagree" ~ 2,
-                                                                        . == "Neither agree nor disagree" ~3,
-                                                                        . == "Somewhat agree" ~ 4,
-                                                                        . == "Strongly agree" ~ 5))) %>%
-  mutate_at(vars(Livelihood_Income), funs(case_when(. == "(a) own farming/fishing/animal rearing/business" ~ "LSI", 
-                                                    . == "(b) employed for wages/salary" ~ "ISI",
-                                                    . == "(c) student" ~"student",
-                                                    . == "(d) currently unemployed" ~ "unemployed",
-                                                    . == "(e) homemaker" ~ "homemaker",
-                                                    . == "(f) retired" ~ "retired",
-                                                    . == "(g) unable to work" ~ "unable to work" ))) %>%
-  
-  # coding education
-  mutate_at(vars(education), funs(case_when(. == "No schooling completed" ~ 0, 
-                                            . == "Primary school" ~ 1,
-                                            . == "Grade 10th" ~ 2,
-                                            . == "Grade 12th" ~ 3,
-                                            . == "Some college, no degree" ~ 4,
-                                            . == "Trade/technical/vocational training" ~ 5,
-                                            . == "Bachelor's degree" ~ 6,
-                                            . == "Master's degree" ~ 7,
-                                            . == "Professional degree" ~ 8,
-                                            . == "Doctorate degree" ~ 9 ))) %>%
-  # coding yes and no questions
-  mutate_at(vars(Iassociation, govtscheme, wateravail, polposition, polparty), funs(case_when(.== "Yes" ~ 1,
-                                                                                              .== "No" ~ 0))) %>%
-  # reverse coding yes and no questions
-  mutate_at(vars(illness,severeillness), funs(case_when(.== "Yes" ~ 0,
-                                                        .== "No" ~ 1))) %>%
-  
-  # coding How confident are you that you can continue your current livelihood if you want to? 
-  mutate_at(vars(Lconfidence), funs(case_when(. == "Not at all confident" ~ 1, 
-                                              . == "Not much confident" ~ 2,
-                                              . == "Neutral" ~3,
-                                              . == "Somewhat confident" ~ 4,
-                                              . == "Very confident" ~ 5))) %>%
-  
-  mutate_at(vars(Lboat, houseown), funs(case_when(.== "Own it" ~ 1,
-                                                  .== "Rent it" ~ 0)))%>%
-  # J security index coding
-  
-  mutate_at(vars(JISRkeep), funs(case_when(. == "Strongly disagree" ~ 1, 
-                                           . == "Somewhat disagree" ~ 2,
-                                           . == "Neither agree nor disagree" ~3,
-                                           . == "Somewhat agree" ~ 4,
-                                           . == "Strongly agree" ~ 5))) %>%
-  
-  
-  # reverse code JIS 
-  mutate_at(vars(JISlosefuture, JISlose, JISfuture), funs(case_when(. == "Strongly disagree" ~ 5, 
-                                                                    . == "Somewhat disagree" ~ 4,
-                                                                    . == "Neither agree nor disagree" ~3,
-                                                                    . == "Somewhat agree" ~ 2,
-                                                                    . == "Strongly agree" ~ 1))) %>%
-  
-  mutate_at(vars(totalincome, otherincome), funs(case_when(. == "Less than Rs 1,00,000" ~ 1,
-                                                           . == "Rs 1,00,000 to Rs 2,50,000"  ~ 2,
-                                                           . == "Rs 2,50,001 to Rs 5,00,000" ~ 3,
-                                                           . == "Rs 5,00,001 to Rs 10,00,000" ~ 4,
-                                                           . == "Rs 10,00,001 and above"  ~ 5))) %>%
-  
-  mutate_at(vars(workknowledge, subsidyknow), funs(case_when(. == "Very poor" ~ 1, 
-                                                             . == "Poor" ~ 2,
-                                                             . == "Fair" ~3,
-                                                             . == "Good" ~ 4,
-                                                             . == "Very good" ~ 5))) %>%
-  
-  mutate_at(vars(drinkingwater, cookingwater), funs(case_when(. == "Bottled water/ Filtered Water" ~ 1,                                       
-                                                              .  == "Piped into dwelling" ~ 2,                                                  
-                                                              .  == "Piped to neighbour" ~ 3,                                                   
-                                                              .  == "Piped to yard/plot" ~ 4, 
-                                                              .  == "Protected well" ~ 5, 
-                                                              .  == "Public tap/standpipe" ~6,
-                                                              .  == "Surface Water  (River/Dam/Lake/Pond/Stream/Canal/Irrigation Channel)" ~7, 
-                                                              .  == "Tanker Truck" ~ 8,
-                                                              .  == "Tubewell/borehole" ~ 9,
-                                                              .  == "Unprotected Spring" ~ 10))) %>%
-  
-  
-  mutate_at(vars(toilet), funs(case_when(. == "No facility/bush/field" ~ 1,                                       
-                                         .  == "Hanging toilet/hanging latrine" ~ 2,                                             
-                                         .  == "Bucket toilet"  ~ 3,                                                   
-                                         .  == "Composting toilet"  ~ 4, 
-                                         .  == "Pit latrine without slab/open pit" ~ 5, 
-                                         .  == "Pit latrine with slab" ~6,
-                                         .  == "Ventilated improved pit laterine"  ~7, 
-                                         .  == "Flush to somewhere else"  ~ 8,
-                                         .  == "Flush to pit latrine"  ~ 9,
-                                         .  == "Flush to septic tank" ~ 10,
-                                         .  == "Flush to piped sewer system" ~ 11))) %>%
-  
-  mutate_at(vars(house), funs(case_when(. == "Hut made of mud, bamboo, straw etc. (kutcha house)" ~ 1, 
-                                        . == "Permanent single story house (pukka house)" ~ 2,
-                                        . == "Apartment/Flat in a multi-story building"  ~3,
-                                        . == "Multi-story house" ~ 4))) %>% 
-  
-  mutate_at(vars(foodtrouble), funs(case_when(. == "8 or more months" ~ 1,                                       
-                                              .  == "6-8 months"  ~ 2,                                                  
-                                              .  == "4-6 months"  ~ 3,                                                   
-                                              .  == "2-4 months"  ~ 4, 
-                                              .  == "1-2 months" ~ 5, 
-                                              .  == "0 months"  ~6))) %>%
-  
-  mutate_at(vars(foodadequacy), funs(case_when(. == "Extremely inadequate" ~ 1, 
-                                               . == "Moderately inadequate" ~ 2,
-                                               . == "Slightly inadequate" ~3,
-                                               . == "Neither adequate nor inadequate" ~ 4,
-                                               . == "Slightly adequate" ~ 5,
-                                               . == "Moderately adequate" ~ 6,
-                                               . == "Extremely adequate" ~ 7)))
+}
 
 
 
